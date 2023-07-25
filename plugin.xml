@@ -1,0 +1,40 @@
+<?xml version='1.0' encoding='utf-8'?>
+<plugin id="nostr-keystore-cordova-plugin"
+        version="1.5.6"
+        xmlns="http://apache.org/cordova/ns/plugins/1.0"
+        xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <name>NostrWalletStore</name>
+    <author>Dzianis Monich</author>
+
+    <description>
+        Cordova plugin for Nostr wallet storage and management.
+    </description>
+
+    <license>MIT</license>
+
+    <keywords>ecosystem:cordova, mobile, android, nostr, walletstore</keywords>
+
+    <js-module name="NostrWalletStore" src="www/nostr.js">
+        <clobbers target="cordova.plugins.NostrWalletStore" />
+    </js-module>
+
+    <platform name="android">
+        <config-file parent="/*" target="res/xml/config.xml">
+            <preference name="GradlePluginKotlinEnabled" value="true" />
+            <feature name="NostrWalletStore">
+                <param name="android-package" value="com.nostr.band.walletStore.Nostr" />
+            </feature>
+        </config-file>
+        <config-file parent="/*" target="AndroidManifest.xml" />
+        <source-file src="src/android/Nostr.java" target-dir="src/com/nostr/band/walletStore" />
+
+        <config-file target="AndroidManifest.xml" parent="application">
+            <activity android:name="com.nostr.band.walletStore.ModalActivity"></activity>
+        </config-file>
+
+    </platform>
+
+
+
+</plugin>

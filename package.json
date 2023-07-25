@@ -1,0 +1,28 @@
+{
+  "name": "nostr-cordova-plugin-wallet-store",
+  "version": "1.0.0",
+  "description": "Cordova plugin for Nostr wallet storage and management",
+  "cordova": {
+    "id": "nostr-cordova-plugin-wallet-store",
+    "platforms": [
+      "android"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nostrband/nostr-walletstore-cordova-plugin.git"
+  },
+  "keywords": [
+    "ecosystem:cordova",
+    "mobile",
+    "android",
+    "nostr",
+    "keystore"
+  ],
+  "author": "Dzianis Monich",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/nostrband/nostr-walletstore-cordova-plugin/issues"
+  },
+  "homepage": "https://github.com/nostrband/nostr-walletstore-cordova-plugin.git"
+}
