@@ -41,6 +41,7 @@ import java.security.KeyPairGenerator;
 import java.security.KeyStore;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashSet;
@@ -121,22 +122,22 @@ public class Nostr extends CordovaPlugin {
   private boolean editWallet(JSONArray args, CallbackContext callbackContext) throws JSONException {
 
     JSONObject jsonObject = args.getJSONObject(0);
-    String publicKey = jsonObject.getString("publicKey");
+    String id = jsonObject.getString("id");
     String name = jsonObject.getString("name");
 
     String keysData = getKeysStringData();
     JSONObject keysObjectData = getKeysObjectData(keysData);
 
-    if (!existWalletKey(publicKey, keysObjectData.names())) {
+    if (!existWalletKey(id, keysObjectData)) {
       callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "Wallet key doesn't exist"));
       return false;
     }
-    if (existWalletKeyName(publicKey, name, keysObjectData)) {
+    if (existWalletKeyName(id, name, keysObjectData)) {
       callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "Wallet name already exist"));
       return false;
     }
 
-    JSONObject key = keysObjectData.getJSONObject(publicKey);
+    JSONObject key = keysObjectData.getJSONObject(id);
     key.put("name", name);
 
     writeValues(getContext(), WALLETS_ALIAS, keysObjectData.toString().getBytes());
@@ -149,19 +150,19 @@ public class Nostr extends CordovaPlugin {
   private boolean deleteWallet(JSONArray args, CallbackContext callbackContext) throws JSONException {
 
     JSONObject jsonObject = args.getJSONObject(0);
-    String publicKey = jsonObject.getString("publicKey");
+    String id = jsonObject.getString("id");
 
     String keysData = getKeysStringData();
     JSONObject keysObjectData = getKeysObjectData(keysData);
 
-    if (!existWalletKey(publicKey, keysObjectData.names())) {
+    if (!existWalletKey(id, keysObjectData)) {
       callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "Wallet Key doesn't exist"));
       return false;
     }
 
     Runnable runnable = () -> {
       AlertDialog.Builder alertDialogBuilder = initAlertDialog("", "Do you want delete wallet?");
-      setPositiveDeleteButton(alertDialogBuilder, "ok", keysObjectData, publicKey, callbackContext);
+      setPositiveDeleteButton(alertDialogBuilder, "ok", keysObjectData, id, callbackContext);
       setNegativeButton(alertDialogBuilder, "cancel", callbackContext, PluginResult.Status.OK);
       setOnCancelListener(alertDialogBuilder, callbackContext, PluginResult.Status.OK);
       AlertDialog alertDialog = showAlertDialog(alertDialogBuilder);
@@ -196,17 +197,17 @@ public class Nostr extends CordovaPlugin {
   private boolean selectWallet(JSONArray args, CallbackContext callbackContext) throws JSONException {
 
     JSONObject jsonObject = args.getJSONObject(0);
-    String publicKey = jsonObject.getString("publicKey");
+    String id = jsonObject.getString("id");
 
     String keysData = getKeysStringData();
     JSONObject keysObjectData = getKeysObjectData(keysData);
 
-    if (!existWalletKey(publicKey, keysObjectData.names())) {
+    if (!existWalletKey(id, keysObjectData)) {
       callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "Key doesn't exist"));
       return false;
     }
 
-    keysObjectData.put(CURRENT_ALIAS, publicKey);
+    keysObjectData.put(CURRENT_ALIAS, id);
 
     writeValues(getContext(), WALLETS_ALIAS, keysObjectData.toString().getBytes());
 
@@ -360,6 +361,7 @@ public class Nostr extends CordovaPlugin {
                 return;
               }
 
+              String id = new String(generateRandomIntArray(64), StandardCharsets.UTF_8);
               String publicKey = getPublicWalletKeyFromInputWalletKey(walletKey);
               String privateKey = getPrivateWalletKeyFromInputWalletKey(walletKey);
               String relayKey = getWalletRelayFromInputWalletKey(walletKey);
@@ -367,7 +369,7 @@ public class Nostr extends CordovaPlugin {
               try {
                 String keysData = getKeysStringData();
                 JSONObject keysObjectData = getKeysObjectData(keysData);
-                if (existWalletKey(publicKey, keysObjectData.names())) {
+                if (existWalletKey(publicKey, keysObjectData)) {
                   callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "Key already exist"));
                   return;
                 }
@@ -375,18 +377,14 @@ public class Nostr extends CordovaPlugin {
                   callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "Name already exist"));
                   return;
                 }
-                saveCurrentAlias(keysObjectData, walletName, publicKey, relayKey);
+                saveCurrentAlias(keysObjectData, walletName, publicKey, relayKey, id);
+
+                savePrivateKey(id, privateKey);
+
+                callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK, keysObjectData.getJSONObject(id)));
               } catch (JSONException e) {
                 callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "Something went wrong"));
-                return;
               }
-
-              savePrivateKey(publicKey, privateKey);
-
-              String response = getWalletId(publicKey, privateKey);
-
-              JSONObject result = initResponseJSONObject(response);
-              callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK, result));
             });
   }
 
@@ -430,7 +428,6 @@ public class Nostr extends CordovaPlugin {
   }
 
   private String getPrivateWalletKeyFromInputWalletKey(String walletKey) {
-    //todo is it correct?
     return walletKey.substring(walletKey.indexOf("secret="), walletKey.length() - 1);
   }
 
@@ -455,11 +452,23 @@ public class Nostr extends CordovaPlugin {
     return new JSONObject();
   }
 
-  private boolean existWalletKey(String publicKey, JSONArray names) throws JSONException {
+  private boolean existWalletKey(String publicKey, JSONObject keysObjectData) throws JSONException {
 
-    Set<String> namesList = mapJSONArrayToSet(names);
+    Set<String> namesList = mapJSONArrayToSet(keysObjectData.names());
 
-    return namesList.contains(publicKey);
+    Set<String> namesSet = namesList.stream()
+            .filter(keyName -> !CURRENT_ALIAS.equals(keyName) && !publicKey.equals(keyName))
+            .map(keyName -> {
+              try {
+                JSONObject key = keysObjectData.getJSONObject(keyName);
+                return key.getString("publicKey");
+              } catch (JSONException e) {
+                return null;
+              }
+            })
+            .collect(Collectors.toSet());
+
+    return namesSet.contains(publicKey);
   }
 
   private boolean existWalletKeyName(String publicKey, String name, JSONObject keysObjectData) throws JSONException {
@@ -494,12 +503,12 @@ public class Nostr extends CordovaPlugin {
     return namesList;
   }
 
-  private void saveCurrentAlias(JSONObject keysObjectData, String keyName, String publicKey, String relay) throws JSONException {
-    addKey(keysObjectData, publicKey, keyName, relay);
+  private void saveCurrentAlias(JSONObject keysObjectData, String keyName, String publicKey, String relay, String id) throws JSONException {
+    addKey(keysObjectData, publicKey, keyName, relay, id);
     writeValues(getContext(), WALLETS_ALIAS, keysObjectData.toString().getBytes());
   }
 
-  private void addKey(JSONObject keysObjectData, String publicKey, String keyName, String relay) throws JSONException {
+  private void addKey(JSONObject keysObjectData, String publicKey, String keyName, String relay, String id) throws JSONException {
     JSONArray names = keysObjectData.names();
     if (names != null && names.length() > 0) {
       for (int i = 0; i < names.length(); i++) {
@@ -512,15 +521,16 @@ public class Nostr extends CordovaPlugin {
       }
     }
 
-    keysObjectData.put(CURRENT_ALIAS, publicKey);
+    keysObjectData.put(CURRENT_ALIAS, id);
 
     JSONObject newKey = new JSONObject();
+    newKey.put("id", id);
     newKey.put("name", keyName);
     newKey.put("publicKey", publicKey);
     newKey.put("isCurrent", true);
     newKey.put("relay", relay);
 
-    keysObjectData.put(publicKey, newKey);
+    keysObjectData.put(id, newKey);
   }
 
   private void savePrivateKey(String alias, String input) {
@@ -596,27 +606,22 @@ public class Nostr extends CordovaPlugin {
     return result;
   }
 
-  private String getWalletId(String walletPubKey, String secret) {
-    //todo implement logic
-    return walletPubKey;
-  }
-
-  private void setPositiveDeleteButton(AlertDialog.Builder alertDialog, String buttonLabel, JSONObject keysObjectData, String publicKey, CallbackContext callbackContext) {
+  private void setPositiveDeleteButton(AlertDialog.Builder alertDialog, String buttonLabel, JSONObject keysObjectData, String id, CallbackContext callbackContext) {
     alertDialog.setPositiveButton(buttonLabel,
             (dialog, which) -> {
               dialog.dismiss();
 
-              keysObjectData.remove(publicKey);
+              keysObjectData.remove(id);
               try {
                 String currentKey = keysObjectData.getString(CURRENT_ALIAS);
-                if (currentKey.equals(publicKey)) {
+                if (currentKey.equals(id)) {
                   keysObjectData.put(CURRENT_ALIAS, "");
                 }
               } catch (JSONException e) {
                 callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "Something went wrong"));
               }
 
-              removeValues(getContext(), publicKey);
+              removeValues(getContext(), id);
 
               callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK, keysObjectData));
             });
@@ -683,5 +688,11 @@ public class Nostr extends CordovaPlugin {
     return Hex.encode(bytes);
   }
 
+  private byte[] generateRandomIntArray(int size) {
+    SecureRandom random = new SecureRandom();
+    byte[] array = new byte[size];
+    random.nextBytes(array);
+    return array;
+  }
 }
 
