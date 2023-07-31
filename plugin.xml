@@ -28,6 +28,10 @@
         </config-file>
         <config-file parent="/*" target="AndroidManifest.xml" />
         <source-file src="src/android/Nostr.java" target-dir="src/com/nostr/band/walletStore" />
+        <source-file src="src/android/KeyStorageUtil.kt" target-dir="java/com/nostr/band/walletStore/" />
+        <source-file src="src/android/Bech32Util.kt" target-dir="java/com/nostr/band/walletStore/" />
+        <source-file src="src/android/Utils.kt" target-dir="java/com/nostr/band/walletStore/" />
+        <framework custom="true" src="src/android/gradle.gradle" type="gradleReference"/>
 
         <config-file target="AndroidManifest.xml" parent="application">
             <activity android:name="com.nostr.band.walletStore.ModalActivity"></activity>
