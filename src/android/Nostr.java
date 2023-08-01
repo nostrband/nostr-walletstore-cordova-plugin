@@ -13,15 +13,24 @@ import static com.nostr.band.walletStore.Utils.sign;
 
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.security.KeyPairGeneratorSpec;
 import android.util.Log;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.MultiFormatWriter;
+import com.google.zxing.WriterException;
+import com.google.zxing.common.BitMatrix;
+import com.journeyapps.barcodescanner.BarcodeEncoder;
 
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaInterface;
@@ -66,6 +75,7 @@ public class Nostr extends CordovaPlugin {
   private static final String KEYSTORE_PROVIDER_3 = "AndroidOpenSSL";
   private static final String RSA_ALGORITHM = "RSA/ECB/PKCS1Padding";
   private static final String TAG = "NostrWalletLogTag";
+  private static final String WALLET_KEY_PREFIX = "nostr+walletconnect:";
 
 
   @Override
@@ -106,6 +116,10 @@ public class Nostr extends CordovaPlugin {
     } else if (action.equals("decryptData")) {
 
       return decryptData(args, callbackContext);
+
+    } else if (action.equals("showKey")) {
+
+      return showKey(args, callbackContext);
 
     }
 
@@ -222,7 +236,7 @@ public class Nostr extends CordovaPlugin {
       AlertDialog.Builder alertDialogBuilder = initAlertDialog("Please enter your wallet key", "Wallet key");
 
       TextInputLayout namePromptInput = initInput("name");
-      TextInputLayout nsecPromptInput = initInput("nostr+walletconnect:...");
+      TextInputLayout nsecPromptInput = initInput(WALLET_KEY_PREFIX + "...");
       initWalletKeyInputs(alertDialogBuilder, namePromptInput, nsecPromptInput);
 
       setNegativeButton(alertDialogBuilder, "cancel", callbackContext, PluginResult.Status.ERROR);
@@ -292,6 +306,64 @@ public class Nostr extends CordovaPlugin {
     callbackContext.success(encryptedText);
 
     return true;
+  }
+
+  private boolean showKey(JSONArray args, CallbackContext callbackContext) throws JSONException {
+
+    JSONObject jsonObject = args.getJSONObject(0);
+    String id = jsonObject.getString("id");
+
+    String walletPrivateKey = getPrivateKey(id);
+
+    String keysData = getKeysStringData();
+    JSONObject keysObjectData = getKeysObjectData(keysData);
+    JSONObject walletData = keysObjectData.getJSONObject(id);
+    String walletKey = WALLET_KEY_PREFIX +
+            walletData.getString("publicKey") +
+            "?relay=" + walletData.getString("relay") +
+            "&secret=" + walletPrivateKey;
+
+    if ("".equals(walletPrivateKey)) {
+      callbackContext.error("Key doesn't exist");
+      return false;
+    }
+
+    Runnable runnable = () -> {
+      AlertDialog.Builder alertDialogBuilder = initAlertDialog(walletKey, "Wallet Key");
+      setQrCodeToAlertDialog(alertDialogBuilder, walletKey);
+      setNegativeButton(alertDialogBuilder, "ok", callbackContext, PluginResult.Status.OK);
+      setCopyButton(alertDialogBuilder, "Wallet key", walletKey);
+      setOnCancelListener(alertDialogBuilder, callbackContext, PluginResult.Status.OK);
+      AlertDialog alertDialog = showAlertDialog(alertDialogBuilder);
+      changeTextDirection(alertDialog);
+    };
+
+    this.cordova.getActivity().runOnUiThread(runnable);
+
+    return true;
+  }
+
+  private void setCopyButton(AlertDialog.Builder alertDialog, String label, String copyText) {
+    alertDialog.setNeutralButton("Copy",
+            (dialog, which) -> {
+              ClipboardManager clipboardManager = (ClipboardManager) cordova.getActivity().getSystemService(Context.CLIPBOARD_SERVICE);
+              ClipData clipData = ClipData.newPlainText(label, copyText);
+              clipboardManager.setPrimaryClip(clipData);
+            });
+  }
+
+  private void setQrCodeToAlertDialog(AlertDialog.Builder alertDialog, String message) {
+    try {
+      MultiFormatWriter multiFormatWriter = new MultiFormatWriter();
+      BitMatrix bitMatrix = multiFormatWriter.encode(message, BarcodeFormat.QR_CODE, 500, 500);
+      BarcodeEncoder barcodeEncoder = new BarcodeEncoder();
+      final Bitmap bitmap = barcodeEncoder.createBitmap(bitMatrix);
+      ImageView imageView = new ImageView(getContext());
+      imageView.setImageBitmap(bitmap);
+      alertDialog.setView(imageView);
+    } catch (WriterException e) {
+      e.printStackTrace();
+    }
   }
 
   private AlertDialog.Builder initAlertDialog(String message, String title) {
@@ -423,7 +495,7 @@ public class Nostr extends CordovaPlugin {
   }
 
   private String getPublicWalletKeyFromInputWalletKey(String walletKey) {
-    walletKey = walletKey.replaceFirst("nostr+walletconnect:", "");
+    walletKey = walletKey.replaceFirst(WALLET_KEY_PREFIX, "");
     return walletKey.substring(0, walletKey.indexOf("?"));
   }
 
