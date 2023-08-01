@@ -1,15 +1,15 @@
 package com.nostr.band.walletStore;
 
-import static com.nostr.band.walletStore.Bech32.Encoding;
-import static com.nostr.band.walletStore.Bech32.decodeBytes;
-import static com.nostr.band.walletStore.KeyStorage.readValues;
-import static com.nostr.band.walletStore.KeyStorage.removeValues;
-import static com.nostr.band.walletStore.KeyStorage.writeValues;
-import static com.nostr.band.walletStore.Utils.decrypt;
-import static com.nostr.band.walletStore.Utils.encrypt;
-import static com.nostr.band.walletStore.Utils.generateId;
-import static com.nostr.band.walletStore.Utils.pubkeyCreate;
-import static com.nostr.band.walletStore.Utils.sign;
+import static com.nostr.band.Bech32.Encoding;
+import static com.nostr.band.Bech32.decodeBytes;
+import static com.nostr.band.KeyStorage.readValues;
+import static com.nostr.band.KeyStorage.removeValues;
+import static com.nostr.band.KeyStorage.writeValues;
+import static com.nostr.band.Utils.decrypt;
+import static com.nostr.band.Utils.encrypt;
+import static com.nostr.band.Utils.generateId;
+import static com.nostr.band.Utils.pubkeyCreate;
+import static com.nostr.band.Utils.sign;
 
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
