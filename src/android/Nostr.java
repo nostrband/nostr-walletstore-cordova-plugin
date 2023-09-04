@@ -18,6 +18,7 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.net.Uri;
 import android.security.KeyPairGeneratorSpec;
 import android.util.Log;
 import android.widget.ImageView;
@@ -44,6 +45,8 @@ import org.spongycastle.util.encoders.Hex;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.math.BigInteger;
+import java.net.URLDecoder;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -495,17 +498,18 @@ public class Nostr extends CordovaPlugin {
   }
 
   private String getPublicWalletKeyFromInputWalletKey(String walletKey) {
-    walletKey = walletKey.replaceFirst(WALLET_KEY_PREFIX, "");
-    return walletKey.substring(0, walletKey.indexOf("?"));
+    Uri uri = Uri.parse(walletKey);
+    return uri.getHost();
   }
 
   private String getPrivateWalletKeyFromInputWalletKey(String walletKey) {
-    return walletKey.substring(walletKey.indexOf("secret="), walletKey.length() - 1);
+    Uri uri = Uri.parse(walletKey);
+    return uri.getQueryParameter("secret");
   }
 
   private String getWalletRelayFromInputWalletKey(String walletKey) {
-    String afterRelay = walletKey.substring(walletKey.indexOf("relay="), walletKey.length() - 1);
-    return afterRelay.substring(0, walletKey.indexOf("&"));
+    Uri uri = Uri.parse(walletKey);
+    return uri.getQueryParameter("relay");
   }
 
   private String getKeysStringData() {
