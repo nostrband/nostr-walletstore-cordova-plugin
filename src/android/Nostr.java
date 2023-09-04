@@ -433,7 +433,7 @@ public class Nostr extends CordovaPlugin {
                 return;
               }
 
-              String id = new String(generateRandomIntArray(64), StandardCharsets.UTF_8);
+              String id = new String(Hex.encode(generateRandomIntArray(32)), StandardCharsets.UTF_8);
               String publicKey = getPublicWalletKeyFromInputWalletKey(walletKey);
               String privateKey = getPrivateWalletKeyFromInputWalletKey(walletKey);
               String relayKey = getWalletRelayFromInputWalletKey(walletKey);
