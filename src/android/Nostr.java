@@ -1,7 +1,5 @@
 package com.nostr.band.walletStore;
 
-import static com.nostr.band.walletStore.Bech32.Encoding;
-import static com.nostr.band.walletStore.Bech32.decodeBytes;
 import static com.nostr.band.walletStore.KeyStorage.readValues;
 import static com.nostr.band.walletStore.KeyStorage.removeValues;
 import static com.nostr.band.walletStore.KeyStorage.writeValues;
@@ -742,8 +740,7 @@ public class Nostr extends CordovaPlugin {
   }
 
   private byte[] getBytePrivateKey(String privateKey) {
-    Triple<String, byte[], Encoding> stringEncodingTriple = decodeBytes(privateKey, false);
-    return stringEncodingTriple.getSecond();
+    return Hex.decode(privateKey);
   }
 
   private List<List<String>> parseTags(JSONArray jsonArray) throws JSONException {
