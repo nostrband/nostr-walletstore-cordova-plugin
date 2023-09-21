@@ -145,12 +145,12 @@ public class Nostr extends CordovaPlugin {
 
     if (!existWalletKey(id, keysObjectData)) {
       callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "Wallet key doesn't exist"));
-      return false;
+      return true;
     }
-    if (existWalletKeyName(id, name, keysObjectData)) {
-      callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "Wallet name already exist"));
-      return false;
-    }
+//    if (existWalletKeyName(id, name, keysObjectData)) {
+//      callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "Wallet name already exist"));
+//      return true;
+//    }
 
     JSONObject key = keysObjectData.getJSONObject(id);
     key.put("name", name);
@@ -172,13 +172,13 @@ public class Nostr extends CordovaPlugin {
 
     if (!existWalletKey(id, keysObjectData)) {
       callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "Wallet Key doesn't exist"));
-      return false;
+      return true;
     }
 
     Runnable runnable = () -> {
-      AlertDialog.Builder alertDialogBuilder = initAlertDialog("", "Do you want delete wallet?");
-      setPositiveDeleteButton(alertDialogBuilder, "ok", keysObjectData, id, callbackContext);
-      setNegativeButton(alertDialogBuilder, "cancel", callbackContext, PluginResult.Status.OK);
+      AlertDialog.Builder alertDialogBuilder = initAlertDialog("", "Do you want to delete the wallet?");
+      setPositiveDeleteButton(alertDialogBuilder, "OK", keysObjectData, id, callbackContext);
+      setNegativeButton(alertDialogBuilder, "Cancel", callbackContext, PluginResult.Status.OK);
       setOnCancelListener(alertDialogBuilder, callbackContext, PluginResult.Status.OK);
       AlertDialog alertDialog = showAlertDialog(alertDialogBuilder);
       changeTextDirection(alertDialog);
@@ -217,9 +217,9 @@ public class Nostr extends CordovaPlugin {
     String keysData = getKeysStringData();
     JSONObject keysObjectData = getKeysObjectData(keysData);
 
-    if (!existWalletKey(id, keysObjectData)) {
-      callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "Key doesn't exist"));
-      return false;
+    if (!id.equals("") && !existWalletKey(id, keysObjectData)) {
+      callbackContext.error("Key doesn't exist");
+      return true;
     }
 
     keysObjectData.put(CURRENT_ALIAS, id);
@@ -234,14 +234,14 @@ public class Nostr extends CordovaPlugin {
   private synchronized void addWalletPrompt(CallbackContext callbackContext) {
 
     Runnable runnable = () -> {
-      AlertDialog.Builder alertDialogBuilder = initAlertDialog("Please enter your wallet key", "Wallet key");
+      AlertDialog.Builder alertDialogBuilder = initAlertDialog("Please enter your wallet connection string (nostr+walletconnect:...)", "Wallet connection");
 
-      TextInputLayout namePromptInput = initInput("name");
-      TextInputLayout nsecPromptInput = initInput(WALLET_KEY_PREFIX + "...");
-      initWalletKeyInputs(alertDialogBuilder, namePromptInput, nsecPromptInput);
+      TextInputLayout namePromptInput = initInput("My LN wallet");
+      TextInputLayout strPromptInput = initInput(""); // WALLET_KEY_PREFIX + "...");
+      initWalletKeyInputs(alertDialogBuilder, namePromptInput, strPromptInput);
 
-      setNegativeButton(alertDialogBuilder, "cancel", callbackContext, PluginResult.Status.ERROR);
-      setAddWalletPositiveButton(alertDialogBuilder, "save", namePromptInput, nsecPromptInput, callbackContext);
+      setNegativeButton(alertDialogBuilder, "Cancel", callbackContext, PluginResult.Status.ERROR);
+      setAddWalletPositiveButton(alertDialogBuilder, "Save", namePromptInput, strPromptInput, callbackContext);
       setOnCancelListener(alertDialogBuilder, callbackContext, PluginResult.Status.ERROR);
 
       AlertDialog alertDialog = showAlertDialog(alertDialogBuilder);
@@ -326,7 +326,7 @@ public class Nostr extends CordovaPlugin {
 
     if ("".equals(walletPrivateKey)) {
       callbackContext.error("Key doesn't exist");
-      return false;
+      return true;
     }
 
     Runnable runnable = () -> {
@@ -430,7 +430,7 @@ public class Nostr extends CordovaPlugin {
               String walletName = namePromptInput.getEditText() != null ? namePromptInput.getEditText().getText().toString().trim() : "";
 
               if (!isValidAddKeyInputValues(walletKey, walletName)) {
-                callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK, "PrivateKey or Name isn't valid"));
+                callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "Connect string isn't valid"));
                 return;
               }
 
@@ -442,14 +442,14 @@ public class Nostr extends CordovaPlugin {
               try {
                 String keysData = getKeysStringData();
                 JSONObject keysObjectData = getKeysObjectData(keysData);
-                if (existWalletKey(publicKey, keysObjectData)) {
-                  callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "Key already exist"));
-                  return;
-                }
-                if (existWalletKeyName(publicKey, walletName, keysObjectData)) {
-                  callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "Name already exist"));
-                  return;
-                }
+//                if (existWalletKey(publicKey, keysObjectData)) {
+//                  callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "Key already exist"));
+//                  return;
+//                }
+//                if (existWalletKeyName(publicKey, walletName, keysObjectData)) {
+//                  callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "Name already exist"));
+//                  return;
+//                }
                 saveCurrentAlias(keysObjectData, walletName, publicKey, relayKey, id);
 
                 savePrivateKey(id, privateKey);
@@ -487,8 +487,18 @@ public class Nostr extends CordovaPlugin {
     }
 
     try {
-      //todo add wallet key validation(get requirements)
+      Uri uri = Uri.parse(walletKey);
+      if (!uri.getScheme().equals("nostr+walletconnect"))
+        return false;
+      if (uri.getHost().length() != 64)
+        return false;
+      if (uri.getQueryParameter("secret").length() != 64)
+        return false;
+      if (uri.getQueryParameter("relay").isEmpty())
+        return false;
     } catch (IllegalArgumentException e) {
+      return false;
+    } catch (NullPointerException e) {
       return false;
     }
 
@@ -526,43 +536,35 @@ public class Nostr extends CordovaPlugin {
     return new JSONObject();
   }
 
-  private boolean existWalletKey(String publicKey, JSONObject keysObjectData) throws JSONException {
+  private boolean existWalletKey(String id, JSONObject keysObjectData) throws JSONException {
 
     Set<String> namesList = mapJSONArrayToSet(keysObjectData.names());
 
     Set<String> namesSet = namesList.stream()
-            .filter(keyName -> !CURRENT_ALIAS.equals(keyName) && !publicKey.equals(keyName))
-            .map(keyName -> {
-              try {
-                JSONObject key = keysObjectData.getJSONObject(keyName);
-                return key.getString("publicKey");
-              } catch (JSONException e) {
-                return null;
-              }
-            })
+            .filter(keyName -> !CURRENT_ALIAS.equals(keyName))
             .collect(Collectors.toSet());
 
-    return namesSet.contains(publicKey);
+    return namesSet.contains(id);
   }
 
-  private boolean existWalletKeyName(String publicKey, String name, JSONObject keysObjectData) throws JSONException {
-
-    Set<String> namesList = mapJSONArrayToSet(keysObjectData.names());
-
-    Set<String> namesSet = namesList.stream()
-            .filter(keyName -> !CURRENT_ALIAS.equals(keyName) && !publicKey.equals(keyName))
-            .map(keyName -> {
-              try {
-                JSONObject key = keysObjectData.getJSONObject(keyName);
-                return key.getString("name");
-              } catch (JSONException e) {
-                return null;
-              }
-            })
-            .collect(Collectors.toSet());
-
-    return namesSet.contains(name);
-  }
+//  private boolean existWalletKeyName(String publicKey, String name, JSONObject keysObjectData) throws JSONException {
+//
+//    Set<String> namesList = mapJSONArrayToSet(keysObjectData.names());
+//
+//    Set<String> namesSet = namesList.stream()
+//            .filter(keyName -> !CURRENT_ALIAS.equals(keyName) && !publicKey.equals(keyName))
+//            .map(keyName -> {
+//              try {
+//                JSONObject key = keysObjectData.getJSONObject(keyName);
+//                return key.getString("name");
+//              } catch (JSONException e) {
+//                return null;
+//              }
+//            })
+//            .collect(Collectors.toSet());
+//
+//    return namesSet.contains(name);
+//  }
 
   private Set<String> mapJSONArrayToSet(JSONArray names) throws JSONException {
     Set<String> namesList = new HashSet<>();
@@ -695,7 +697,12 @@ public class Nostr extends CordovaPlugin {
                 callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "Something went wrong"));
               }
 
+              // remove secret
+              Log.d(TAG, "delete file "+id);
               removeValues(getContext(), id);
+
+              // update the list of wallets
+              writeValues(getContext(), WALLETS_ALIAS, keysObjectData.toString().getBytes());
 
               callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK, keysObjectData));
             });
